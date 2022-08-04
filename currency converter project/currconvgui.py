@@ -2,112 +2,134 @@ import tkinter as tk
 import customtkinter as ctk
 import requests
 
-root = ctk.CTk()
-
 
 def fetch_currencies_data(source: str):
-    if source == "":
+    if is_normal(source):
         source = "symbols"
-    elif source == "crypto":
+    else:
         source = "cryptocurrencies"
     url = f"https://api.exchangerate.host/{source}"
-    data = requests.get(url).json()
-    return data[source]
+    data = requests.get(url).json()[source]
+    return data
 
 
-def fetch_data_to_string(source: str, currency1: str, currency2: str, amount: float):
-    if source == "" and (currency1 not in normal_list or currency2 not in normal_list):
-            return "Wrong currency"
-    elif source == "crypto" and (currency1 not in crypto_list or currency2 not in crypto_list):
-            return "Wrong currency"
-    elif amount < 0:
-        return "please enter a correct amount"
+def fetch_convert(source: str, currency1: str, currency2: str, amount: float):
     url = f"https://api.exchangerate.host/convert?source={source}&from={currency1}&to={currency2}&amount={amount}"
     data = requests.get(url).json()
+    return data_to_string(source, data)
+
+
+def data_to_string(source: str, data: dict):
+    currency1 = data["query"]["from"]
+    currency2 = data["query"]["to"]
+    amount = data["query"]["amount"]
     rate = data["info"]["rate"]
     result = data["result"]
-    if source == "":
-        currencies_data = fetch_currencies_data("symbols")
+    currencies_data = data_of(source)
+    if is_normal(source):
         currency1_desc = currencies_data[currency1]["description"]
         currency2_desc = currencies_data[currency2]["description"]
-    elif source == "crypto":
-        currencies_data = fetch_currencies_data("cryptocurrencies")
+    else:
         currency1_desc = currencies_data[currency1.lower()]["name"]
         currency2_desc = currencies_data[currency2.lower()]["name"]
-    stringoutput = f"{amount} {currency1} ({currency1_desc}) is {result} {currency2} ({currency2_desc})\nrate: {rate}"
-    return stringoutput
+    string = f"{amount} {currency1} ({currency1_desc}) is {result} {currency2} ({currency2_desc})\nrate: {rate}"
+    return string
 
 
 def currencies_data_to_list(source: str, currencies_data: dict):
-    if source == "":
+    if is_normal(source):
         currencies_list = list(currencies_data.keys())
-    elif source == "crypto":
+    else:
         currencies_list = []
         for i in currencies_data:
-            if not ("REALT" in currencies_data[i]["symbol"]):
-                currencies_list.append(currencies_data[i]["symbol"])
+            currencies_list.append(currencies_data[i]["symbol"])
     currencies_list.sort()
     return currencies_list
 
 
-def calculate():
-    if textentry3.get().isdigit():
-        amount = float(textentry3.get())
+def calculate_button(source: str, currency1: str, currency2: str, amount: str):
+    string = formatter(source, currency1, currency2, amount)
+    write_text_box(string)
+
+
+def formatter(source: str, currency1: str, currency2: str, amount: str):
+    error = error_check(source, currency1, currency2, amount)
+    if error == "None":
+        amount = float(amount)
+        return fetch_convert(source, currency1, currency2, amount)
     else:
-        amount = -1
-    string = fetch_data_to_string(source.get(), textentry1.get().upper(), textentry2.get().upper(), amount)
-    textbox.configure(state=tk.NORMAL)
-    textbox.delete(1.0, tk.END)
-    textbox.insert(tk.END, string)
-    textbox.configure(state=tk.DISABLED)
+        return error
 
 
-def refresh_list(source):
+def error_check(source: str, currency1: str, currency2: str, amount: str):
+    if amount.lstrip("-").isdigit():
+        amount = float(amount)
+    else:
+        return "Please enter a number"
+    if currency1 not in currency_list(source) or currency2 not in currency_list(source):
+        return "Please enter the correct currency"
+    if amount < 0:
+        return "Please enter a positive number"
+    return "None"
+
+
+def currency_list(source: str):
+    return currencies_data_to_list(source, data_of(source))
+
+
+def data_of(source: str):
+    if is_normal(source):
+        return normal_data
+    else:
+        return crypto_data
+
+
+def is_normal(source: str):
     if source == "":
-        list = currencies_data_to_list("", normal_list)
-    elif source == "crypto":
-        list = currencies_data_to_list("crypto", crypto_list)
-    currency_list_box.delete(0, tk.END)
-    for i in (list):
-        currency_list_box.insert(tk.END, i)
+        return True
+    else:
+        return False
 
 
-source = tk.StringVar()
-normal_list = fetch_currencies_data("")
-crypto_list = fetch_currencies_data("crypto")
+def write_text_box(string: str):
+    textbox.configure(state=ctk.NORMAL)
+    textbox.delete(1.0, ctk.END)
+    textbox.insert(ctk.END, string)
+    textbox.configure(state=ctk.DISABLED)
+
+
+root = ctk.CTk()
+root.title("Currency converter")
+
+source = ctk.StringVar()
+
+normal_data = fetch_currencies_data("")
+crypto_data = fetch_currencies_data("crypto")
+
 
 topframe = ctk.CTkFrame(root)
-topframe.pack(pady=10, padx=10)
+topframe.pack(ipady=10, ipadx=10, pady=10, padx=10)
 bottomframe = ctk.CTkFrame(root)
-bottomframe.pack(pady=10, padx=10)
+bottomframe.pack(ipady=10, ipadx=10, pady=10, padx=10)
 
-text1 = ctk.CTkLabel(topframe, text="first currency")
-text1.grid(row=0, column=0)
-text2 = ctk.CTkLabel(topframe, text="second currency")
-text2.grid(row=0, column=1)
-text3 = ctk.CTkLabel(topframe, text="amount")
-text3.grid(row=0, column=2)
+ctk.CTkLabel(topframe, text="first currency").grid(row=0, column=0)
+ctk.CTkLabel(topframe, text="second currency").grid(row=0, column=1)
+ctk.CTkLabel(topframe, text="amount").grid(row=0, column=2)
 
-textentry1 = ctk.CTkEntry(topframe, width=50)
-textentry1.grid(row=1, column=0, padx=5, pady=5)
-textentry2 = ctk.CTkEntry(topframe, width=50)
-textentry2.grid(row=1, column=1, padx=5, pady=5)
-textentry3 = ctk.CTkEntry(topframe, width=50)
-textentry3.grid(row=1, column=2, padx=5, pady=5)
+textentry1 = ctk.CTkEntry(topframe, width=100)
+textentry1.grid(row=1, column=0, padx=20, pady=5)
+textentry2 = ctk.CTkEntry(topframe, width=100)
+textentry2.grid(row=1, column=1, padx=20, pady=5)
+textentry3 = ctk.CTkEntry(topframe, width=100)
+textentry3.grid(row=1, column=2, padx=20, pady=5)
 
-button_calc = ctk.CTkButton(topframe, text="Calculate", command=calculate, width=50)
-button_calc.grid(row=1, column=3, padx=5, pady=5)
+textbox = tk.Text(bottomframe, wrap=ctk.WORD, cursor="arrow", state=ctk.DISABLED, bg="#2a2d2e", bd=0, fg="white", selectbackground="#2a2d2e")
+textbox.pack(padx=10, pady=10)
 
-rad1 = ctk.CTkRadioButton(topframe, text="normal", variable=source, value="", command=lambda : refresh_list(""))
-rad1.grid(row=2, column=0, padx=5, pady=5)
-rad2 = ctk.CTkRadioButton(topframe, text="crypto", variable=source, value="crypto", command=lambda : refresh_list("crypto"))
-rad2.grid(row=2, column=1, padx=5, pady=5)
+ctk.CTkButton(topframe, text="Calculate", command=lambda: calculate_button(source.get(), textentry1.get().upper(), textentry2.get().upper(), textentry3.get()), width=100).grid(row=1, column=3, padx=20, pady=5)
+ctk.CTkButton(topframe, text="List currencies", command=lambda: write_text_box(currency_list(source.get())), width=100).grid(row=3, column=3, padx=20, pady=5)
 
-currency_list_box = tk.Listbox(bottomframe, bg="#292929", fg="white", height=10)
-refresh_list(source.get())
-currency_list_box.grid(row=0, column=0)
-
-textbox = tk.Text(bottomframe, wrap=tk.WORD, state=tk.DISABLED, bg="#292929", height=10, width=50, bd=0, fg="white")
-textbox.grid(row=0, column=1, columnspan=3)
+ctk.CTkRadioButton(topframe, text="normal", variable=source, value="").grid(row=2, column=0)
+ctk.CTkRadioButton(topframe, text="crypto", variable=source, value="crypto").grid(row=3, column=0)
 
 root.mainloop()
